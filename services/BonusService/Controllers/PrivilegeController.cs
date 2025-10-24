@@ -88,13 +88,11 @@ namespace BonusService.Controllers
 
                 if (await _privilegeRepository.ExistsByUsername(username))
                 {
-                    Console.WriteLine($"exists");
                     privilege = new PrivilegeDto(await _privilegeRepository.GetByUsername(username));
                     await _privilegeRepository.UpdateBalance(privilege.Id, historyRequest.BalanceDiff);
                 }
                 else
                 {
-                    Console.WriteLine($"not exists");
                     privilege = new PrivilegeDto(await _privilegeRepository.Add(new Privilege
                     {
                         Id = -1,
@@ -136,7 +134,7 @@ namespace BonusService.Controllers
                 var username = usernameValues[0];
                 PrivilegeDto privilege = new PrivilegeDto(await _privilegeRepository.GetByUsername(username));
                 
-                await _privilegeRepository.UpdateBalance(privilege.Id, -history.BalanceDiff);
+                await _privilegeRepository.UpdateBalance(privilege.Id, history.BalanceDiff);
                 
                 return Ok(privilege);
             }

@@ -55,7 +55,7 @@ public class ControllersFallbacks
         return new PrivilegeShortInfo
         {
             Balance = 0,
-            Status = "BRONZE"
+            Status = "ERROR"
         };
     }
     

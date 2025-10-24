@@ -74,6 +74,9 @@ namespace GatewayService.Controllers
             }
             catch (Exception ex)
             {
+                if (ex is ServerDiedException)
+                    return StatusCode(503, new ErrorResponse { Message = ex.Message });
+                
                 return StatusCode(500, new ErrorResponse { Message = ex.Message });
             }
         }
@@ -205,7 +208,10 @@ namespace GatewayService.Controllers
                     await _ticketsClient.SendAsync(addTicketRequest);
                 }
                 
-                return StatusCode(500, new ErrorResponse { Message = ex.Message });
+                if (ex is ServerDiedException)
+                    return StatusCode(503, new ErrorResponse { Message = ex.Message });
+                
+                return StatusCode(503, new ErrorResponse { Message = ex.Message });
             }
         }
         
@@ -243,6 +249,9 @@ namespace GatewayService.Controllers
             }
             catch (Exception ex)
             {
+                if (ex is ServerDiedException)
+                    return StatusCode(503, new ErrorResponse { Message = ex.Message });
+                
                 return StatusCode(500, new ErrorResponse { Message = ex.Message });
             }
         }
@@ -278,14 +287,17 @@ namespace GatewayService.Controllers
                 var userInfo = new UserInfoResponse
                 {
                     Tickets = ticketsResponse ?? new List<TicketResponse>(),
-                    Privilege = bonusResponse ?? new PrivilegeShortInfo()
+                    Privilege = bonusResponse ?? new PrivilegeShortInfo(),
                 };
                     
-                return Ok(userInfo);
+                return Ok(bonusResponse.Status == "ERROR" ? ticketsResponse : userInfo);
 
             }
             catch (Exception ex)
             {
+                if (ex is ServerDiedException)
+                    return StatusCode(503, new ErrorResponse { Message = ex.Message });
+                
                 return StatusCode(500, new ErrorResponse { Message = ex.Message });
             }
         }
@@ -302,10 +314,9 @@ namespace GatewayService.Controllers
                 var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/privilege");
                 request.Headers.Add("X-User-Name", username);
                 
-                PrivilegeInfoResponse? response = await _circuitBreakersController.ExecuteSoftAsync(
-                    Services.Flights,
-                    async () => await SendRequest<PrivilegeInfoResponse>(_privilegeClient, request),
-                    () => _fallbacks.GetPrivilegeInfoResponseFallback()
+                PrivilegeInfoResponse? response = await _circuitBreakersController.ExecuteAsync(
+                    Services.Bonuses,
+                    async () => await SendRequest<PrivilegeInfoResponse>(_privilegeClient, request)
                 );
                 
                 return Ok(response);
@@ -345,6 +356,9 @@ namespace GatewayService.Controllers
             }
             catch (Exception ex)
             {
+                if (ex is ServerDiedException)
+                    return StatusCode(503, new ErrorResponse { Message = ex.Message });
+                
                 return StatusCode(500, new ErrorResponse { Message = ex.Message });
             }
         }
@@ -390,7 +404,7 @@ namespace GatewayService.Controllers
         
         private async Task<PrivilegeShortInfo> UpdateBonusBalance(string username, Guid ticketUid, int paidByBonuses, int ticketPrice)
         {
-            bool isPaidByBonuses = paidByBonuses > 0;
+            bool isPaidByBonuses = paidByBonuses != 0;
 
             var bonusAmount = (int)(ticketPrice * 0.1);
             
@@ -412,10 +426,9 @@ namespace GatewayService.Controllers
             var privilegeRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/privilege");
             privilegeRequest.Headers.Add("X-User-Name", username);
             
-            PrivilegeInfoResponse? response = await _circuitBreakersController.ExecuteSoftAsync(
-                Services.Flights,
-                async () => await SendRequest<PrivilegeInfoResponse>(_privilegeClient, privilegeRequest),
-                () => _fallbacks.GetPrivilegeInfoResponseFallback()
+            PrivilegeInfoResponse? response = await _circuitBreakersController.ExecuteAsync(
+                Services.Bonuses,
+                async () => await SendRequest<PrivilegeInfoResponse>(_privilegeClient, privilegeRequest)
             );
 
             return new PrivilegeShortInfo
@@ -424,8 +437,5 @@ namespace GatewayService.Controllers
                 Status = response?.Status ?? "BRONZE"
             };
         }
-        
-        
-        
     }
 }
