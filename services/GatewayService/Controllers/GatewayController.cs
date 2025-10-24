@@ -87,10 +87,10 @@ namespace GatewayService.Controllers
                 HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/tickets");
                 request.Headers.Add("X-User-Name", usernameValue[0]);
                 
-                TicketResponse? response = await _circuitBreakersController.ExecuteAsync(
+                List<TicketResponse>? response = await _circuitBreakersController.ExecuteAsync(
                     Services.Tickets,
-                    async () => await SendRequest<TicketResponse>(_ticketsClient, request),
-                    () => _fallbacks.GetTicketsFallback()
+                    async () => await SendRequest<List<TicketResponse>>(_ticketsClient, request),
+                    () => _fallbacks.GetAllTicketsFallback()
                 );
                 
                 return Ok(response);
