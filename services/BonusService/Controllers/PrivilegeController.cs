@@ -122,5 +122,28 @@ namespace BonusService.Controllers
                 return StatusCode(500, new ErrorResponse { Message = ex.Message });
             }
         }
+        
+        // bonuses - "DEBIT_THE_ACCOUNT" : money - "FILL_IN_BALANCE"
+        [HttpPost("return-balance")]
+        public async Task<IActionResult> ReturnBalance([FromBody] ReturnBalanceHistoryRequest request)
+        {
+            try
+            {
+                if (!Request.Headers.TryGetValue("X-User-Name", out var usernameValues))
+                    return BadRequest(new ErrorResponse { Message = "X-User-Name header is required" });
+
+                var history = (await _privilegeHistoryRepository.GetByTicketUid(request.TicketUid))[^1];
+                var username = usernameValues[0];
+                PrivilegeDto privilege = new PrivilegeDto(await _privilegeRepository.GetByUsername(username));
+                
+                await _privilegeRepository.UpdateBalance(privilege.Id, -history.BalanceDiff);
+                
+                return Ok(privilege);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new ErrorResponse { Message = ex.Message });
+            }
+        }
     }
 }
