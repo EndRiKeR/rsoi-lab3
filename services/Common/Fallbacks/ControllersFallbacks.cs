@@ -1,6 +1,9 @@
+using System.Security.Cryptography.X509Certificates;
+using Common.DtoModels.BonusServiceDto;
 using Common.DtoModels.FlightServiceDto;
+using Common.DtoModels.TicketsServiceDto;
 
-namespace FlightService.Controllers.Fallbacks;
+namespace Common.Fallbacks;
 
 public class ControllersFallbacks
 {
@@ -12,6 +15,44 @@ public class ControllersFallbacks
             PageSize = 0,
             TotalElements = 0,
             Items = []
+        };
+    }
+    
+    public TicketResponse GetTicketsFallback(Guid ticketUid = new Guid())
+    {
+        return new TicketResponse
+        {
+            TicketUid = ticketUid,
+            FlightNumber = "",
+            FromAirport = "",
+            ToAirport = "",
+            Date = DateTime.Now,
+            Price = 0,
+            Status = "",
+        };
+    }
+    
+    public List<TicketResponse> GetAllTicketsFallback()
+    {
+        return new();
+    }
+    
+    public PrivilegeShortInfo GetPrivilegeShortInfoFallback()
+    {
+        return new PrivilegeShortInfo
+        {
+            Balance = 0,
+            Status = "BRONZE"
+        };
+    }
+    
+    public PrivilegeInfoResponse GetPrivilegeInfoResponseFallback()
+    {
+        return new PrivilegeInfoResponse
+        {
+            Balance = 0,
+            Status = "BRONZE",
+            History = new()
         };
     }
 }

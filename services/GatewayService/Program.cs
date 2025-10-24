@@ -1,5 +1,5 @@
 using Common.CircuitBreaker;
-using FlightService.Controllers.Fallbacks;
+using Common.Fallbacks;
 
 var builder = WebApplication.CreateBuilder(args);
 
