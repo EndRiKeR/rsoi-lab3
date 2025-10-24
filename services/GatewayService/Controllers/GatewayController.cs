@@ -1,10 +1,13 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using Common.CircuitBreaker;
+using Common.CircuitBreaker.Enums;
 using Common.DtoModels.BonusServiceDto;
 using Common.DtoModels.ErrorDto;
 using Common.DtoModels.FlightServiceDto;
 using Common.DtoModels.GatewayDto;
 using Common.DtoModels.TicketsServiceDto;
+using FlightService.Controllers.Fallbacks;
 
 namespace GatewayService.Controllers
 {
@@ -15,29 +18,48 @@ namespace GatewayService.Controllers
         private readonly HttpClient _ticketsClient;
         private readonly HttpClient _flightsClient;
         private readonly HttpClient _privilegeClient;
+        private readonly CircuitBreakersController _circuitBreakersController;
+        private readonly ControllersFallbacks _fallbacks;
         
-        public GatewayController(IHttpClientFactory httpClientFactory)
+        public GatewayController(
+            IHttpClientFactory httpClientFactory,
+            CircuitBreakersController circuitBreakersController,
+            ControllersFallbacks fallbacks)
         {
             _privilegeClient = httpClientFactory.CreateClient("BonusService");
             _flightsClient = httpClientFactory.CreateClient("FlightService");
             _ticketsClient = httpClientFactory.CreateClient("TicketsService");
+            
+            _circuitBreakersController = circuitBreakersController;
+            _fallbacks = fallbacks;
         }
         
         [HttpGet("flights")]
         public async Task<IActionResult> GetFlights([FromQuery] int page = 1, [FromQuery] int size = 10)
         {
+            async Task<PaginationResponse?> SendResponse()
+            {
+                HttpResponseMessage response = await _flightsClient.GetAsync($"/api/v1/flights?page={page}&size={size}");
+                
+                // ошибку обработает щиток и я не достану текст, так что нет особой разницы, что кидать
+                if (!response.IsSuccessStatusCode)
+                    throw new Exception(await response.Content.ReadAsStringAsync());
+                
+                string content = await response.Content.ReadAsStringAsync();
+                PaginationResponse? flights = JsonSerializer.Deserialize<PaginationResponse>(content);
+                
+                return flights;
+            }
+            
             try
             {
-                var response = await _flightsClient.GetAsync($"/api/v1/flights?page={page}&size={size}");
+                PaginationResponse? response = await _circuitBreakersController.ExecuteAsync(
+                    Services.Flights,
+                    async () => await SendResponse(),
+                    () => _fallbacks.GetFlightsFallback()
+                );
                 
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    var flights = JsonSerializer.Deserialize<PaginationResponse>(content);
-                    return Ok(flights);
-                }
-                
-                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+                return Ok(response);
             }
             catch (Exception ex)
             {
@@ -50,16 +72,16 @@ namespace GatewayService.Controllers
         {
             try
             {
+                // TODO: спрятать в щиток
                 var response = await _flightsClient.GetAsync($"/api/v1/flights/{flightNumber}");
+
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
                 
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    var flight = JsonSerializer.Deserialize<FlightResponse>(content);
-                    return Ok(flight);
-                }
-                
-                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+                var content = await response.Content.ReadAsStringAsync();
+                var flight = JsonSerializer.Deserialize<FlightResponse>(content);
+                return Ok(flight);
+
             }
             catch (Exception ex)
             {
@@ -73,24 +95,22 @@ namespace GatewayService.Controllers
             try
             {
                 if (!Request.Headers.TryGetValue("X-User-Name", out var usernameValue))
-                {
                     return BadRequest(new ErrorResponse { Message = "X-User-Name header is required" });
-                }
                 
                 string? username = usernameValue[0];
                 var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/tickets");
                 request.Headers.Add("X-User-Name", username);
                 
+                // TODO: спрятать в щиток
                 var response = await _ticketsClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
                 
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    var tickets = JsonSerializer.Deserialize<List<TicketResponse>>(content);
-                    return Ok(tickets);
-                }
-                
-                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+                var content = await response.Content.ReadAsStringAsync();
+                var tickets = JsonSerializer.Deserialize<List<TicketResponse>>(content);
+                return Ok(tickets);
+
             }
             catch (Exception ex)
             {
@@ -104,24 +124,22 @@ namespace GatewayService.Controllers
             try
             {
                 if (!Request.Headers.TryGetValue("X-User-Name", out var usernameValue))
-                {
                     return BadRequest(new ErrorResponse { Message = "X-User-Name header is required" });
-                }
                 
                 string? username = usernameValue[0];
                 var request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/tickets/{ticketUid}");
                 request.Headers.Add("X-User-Name", username);
                 
+                // TODO: спрятать в щиток
                 var response = await _ticketsClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
                 
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    var ticket = JsonSerializer.Deserialize<TicketResponse>(content);
-                    return Ok(ticket);
-                }
-                
-                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+                var content = await response.Content.ReadAsStringAsync();
+                var ticket = JsonSerializer.Deserialize<TicketResponse>(content);
+                return Ok(ticket);
+
             }
             catch (Exception ex)
             {
@@ -135,27 +153,24 @@ namespace GatewayService.Controllers
             try
             {
                 if (!Request.Headers.TryGetValue("X-User-Name", out var usernameValue))
-                {
                     return BadRequest(new ErrorResponse { Message = "X-User-Name header is required" });
-                }
                 
                 string? username = usernameValue[0];
                 var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/tickets")
                 {
                     Content = JsonContent.Create(requestDto)
                 };
+                
                 request.Headers.Add("X-User-Name", username);
                 
                 var response = await _ticketsClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
                 
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    var purchaseResponse = JsonSerializer.Deserialize<TicketPurchaseResponse>(content);
-                    return Ok(purchaseResponse);
-                }
-                
-                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+                var content = await response.Content.ReadAsStringAsync();
+                var purchaseResponse = JsonSerializer.Deserialize<TicketPurchaseResponse>(content);
+                return Ok(purchaseResponse);
             }
             catch (Exception ex)
             {
@@ -168,24 +183,17 @@ namespace GatewayService.Controllers
         {
             try
             {
-                Console.WriteLine("-*-*-*-*-*-*-*-*-*-start");
                 if (!Request.Headers.TryGetValue("X-User-Name", out var usernameValue))
-                {
                     return BadRequest(new ErrorResponse { Message = "X-User-Name header is required" });
-                }
                 
                 string? username = usernameValue[0];
                 var request = new HttpRequestMessage(HttpMethod.Delete, $"/api/v1/tickets/{ticketUid}");
                 request.Headers.Add("X-User-Name", username);
                 
                 var response = await _ticketsClient.SendAsync(request);
-                Console.WriteLine($"-*-*-*-*-*-*-*-*-*- {request}");
-                Console.WriteLine($"-*-*-*-*-*-*-*-*-*- {response}");
                 
                 if (response.IsSuccessStatusCode)
-                {
                     return NoContent();
-                }
                 
                 return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
             }
@@ -201,37 +209,38 @@ namespace GatewayService.Controllers
             try
             {
                 if (!Request.Headers.TryGetValue("X-User-Name", out var usernameValue))
-                {
                     return BadRequest(new ErrorResponse { Message = "X-User-Name header is required" });
-                }
                 
                 string? username = usernameValue[0];
                 var ticketsRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/tickets");
                 ticketsRequest.Headers.Add("X-User-Name", username);
+                
+                // TODO: спрятать в щиток
                 var ticketsResponse = await _ticketsClient.SendAsync(ticketsRequest);
                 
                 var bonusRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/privilege");
                 bonusRequest.Headers.Add("X-User-Name", username);
+                
+                // TODO: спрятать в щиток
                 var bonusResponse = await _privilegeClient.SendAsync(bonusRequest);
+
+                if (!ticketsResponse.IsSuccessStatusCode || !bonusResponse.IsSuccessStatusCode)
+                    return StatusCode(500, new ErrorResponse { Message = "Error getting user info" });
                 
-                if (ticketsResponse.IsSuccessStatusCode && bonusResponse.IsSuccessStatusCode)
+                var ticketsContent = await ticketsResponse.Content.ReadAsStringAsync();
+                var bonusContent = await bonusResponse.Content.ReadAsStringAsync();
+                    
+                var tickets = JsonSerializer.Deserialize<List<TicketResponse>>(ticketsContent);
+                var privilege = JsonSerializer.Deserialize<PrivilegeShortInfo>(bonusContent);
+                    
+                var userInfo = new UserInfoResponse
                 {
-                    var ticketsContent = await ticketsResponse.Content.ReadAsStringAsync();
-                    var bonusContent = await bonusResponse.Content.ReadAsStringAsync();
+                    Tickets = tickets ?? new List<TicketResponse>(),
+                    Privilege = privilege ?? new PrivilegeShortInfo()
+                };
                     
-                    var tickets = JsonSerializer.Deserialize<List<TicketResponse>>(ticketsContent);
-                    var privilege = JsonSerializer.Deserialize<PrivilegeShortInfo>(bonusContent);
-                    
-                    var userInfo = new UserInfoResponse
-                    {
-                        Tickets = tickets ?? new List<TicketResponse>(),
-                        Privilege = privilege ?? new PrivilegeShortInfo()
-                    };
-                    
-                    return Ok(userInfo);
-                }
-                
-                return StatusCode(500, new ErrorResponse { Message = "Error getting user info" });
+                return Ok(userInfo);
+
             }
             catch (Exception ex)
             {
@@ -245,24 +254,21 @@ namespace GatewayService.Controllers
             try
             {
                 if (!Request.Headers.TryGetValue("X-User-Name", out var usernameValue))
-                {
                     return BadRequest(new ErrorResponse { Message = "X-User-Name header is required" });
-                }
                 
                 string? username = usernameValue[0];
                 var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/privilege");
                 request.Headers.Add("X-User-Name", username);
                 
+                // TODO: спрятать в щиток
                 var response = await _privilegeClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
                 
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    var privilegeInfo = JsonSerializer.Deserialize<PrivilegeInfoResponse>(content);
-                    return Ok(privilegeInfo);
-                }
-                
-                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+                var content = await response.Content.ReadAsStringAsync();
+                var privilegeInfo = JsonSerializer.Deserialize<PrivilegeInfoResponse>(content);
+                return Ok(privilegeInfo);
             }
             catch (Exception ex)
             {
@@ -276,9 +282,7 @@ namespace GatewayService.Controllers
             try
             {
                 if (!Request.Headers.TryGetValue("X-User-Name", out var usernameValue))
-                {
                     return BadRequest(new ErrorResponse { Message = "X-User-Name header is required" });
-                }
                 
                 string? username = usernameValue[0];
 
@@ -288,15 +292,13 @@ namespace GatewayService.Controllers
                 };
                 request.Headers.Add("X-User-Name", username);
                 var response = await _privilegeClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                    return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
                 
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    var privilegeInfo = JsonSerializer.Deserialize<PrivilegeInfoResponse>(content);
-                    return Ok(privilegeInfo);
-                }
-                
-                return StatusCode((int)response.StatusCode, await response.Content.ReadAsStringAsync());
+                var content = await response.Content.ReadAsStringAsync();
+                var privilegeInfo = JsonSerializer.Deserialize<PrivilegeInfoResponse>(content);
+                return Ok(privilegeInfo);
             }
             catch (Exception ex)
             {

@@ -1,10 +1,12 @@
 using Common.CircuitBreaker;
+using FlightService.Controllers.Fallbacks;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-builder.Services.AddScoped<CircuitBreaker>();
+builder.Services.AddSingleton<CircuitBreakersController>();
+builder.Services.AddSingleton<ControllersFallbacks>();
 
 builder.Services.AddHttpClient("FlightService", client =>
 {

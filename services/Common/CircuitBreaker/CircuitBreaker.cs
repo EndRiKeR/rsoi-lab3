@@ -1,57 +1,82 @@
 ﻿using Common.CircuitBreaker.Enums;
+using Common.LoggerExtensions;
+using Microsoft.Extensions.Logging;
 
 namespace Common.CircuitBreaker;
 
-public class CircuitBreaker
+public class CircuitBreaker : ICircuitBreaker
 {
-    private CircuitState _state = CircuitState.Closed;
-    private int _failureCount = 0;
-    private DateTime _lastFailureTime = DateTime.MinValue;
-    private readonly TimeSpan _openToHalfOpenTimeout = TimeSpan.FromSeconds(30);
-    private readonly int _maxFailuresBeforeOpen = 5;
-    
-    public CircuitState State => _state;
-    public int FailureCount => _failureCount;
-    public DateTime LastFailureTime => _lastFailureTime;
+    public CircuitState State { get; set; } = CircuitState.Closed;
+    public int FailureCount { get; set; } = 0;
+    private DateTime LastFailureTime { get; set; } = DateTime.MinValue;
 
-    public async Task<T> ExecuteAsync<T>(
-        Func<Task<T>> action,
-        Func<T> fallback,
-        string serviceName)
+    private readonly ILogger<CircuitBreaker> _logger;
+    private readonly int _maxFailuresBeforeOpen = 5;
+    private readonly TimeSpan _openToHalfOpenTimeout = TimeSpan.FromSeconds(10);
+    
+    public CircuitBreaker(ILogger<CircuitBreaker> logger)
     {
-        if (_state == CircuitState.Open)
+        _logger = logger;
+        _logger.LogGoodCircuitBreakerInfo("CircuitBreaker готов к работе!");
+    }
+
+    // через этот метод запускается запрос
+    public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, Func<T> fallback)
+    {
+        _logger.LogGoodCircuitBreakerInfo("Щиток пробует выполнить метод");
+        
+        // если цель разомкнута...
+        if (State == CircuitState.Open)
         {
-            if (DateTime.UtcNow - _lastFailureTime > _openToHalfOpenTimeout)
+            _logger.LogGoodCircuitBreakerInfo("Пробуем замкнуть цепь...");
+            
+            // либо возвращает fallback, либо, через время, пытаемся цепь замкнуть
+            if (DateTime.UtcNow - LastFailureTime > _openToHalfOpenTimeout)
             {
-                _state = CircuitState.HalfOpen;
+                State = CircuitState.HalfOpen;
+                _logger.LogBadCircuitBreakerInfo("Пора попробовать снова!");
+                _logger.CircuitBreakerStateChange(State, CircuitState.HalfOpen);
             }
             else
             {
+                _logger.LogBadCircuitBreakerInfo("Рано, попробуй позже");
                 return fallback();
             }
         }
 
+        // пробуем выполнить метод
         try
         {
+            _logger.LogGoodCircuitBreakerInfo("Пробуем выполнить метод");
+            
             var result = await action();
             
-            _failureCount = 0;
+            _logger.LogGoodCircuitBreakerInfo("Все ок!");
             
-            if (_state == CircuitState.HalfOpen)
+            FailureCount = 0;
+            
+            // замыкаем цепь при успешном выполнении
+            if (State == CircuitState.HalfOpen)
             {
-                _state = CircuitState.Closed;
+                _logger.CircuitBreakerStateChange(State, CircuitState.Closed);
+                State = CircuitState.Closed;
             }
             
             return result;
         }
         catch (Exception)
         {
-            _failureCount++;
-            _lastFailureTime = DateTime.UtcNow;
+            FailureCount++;
             
-            if (_failureCount >= _maxFailuresBeforeOpen)
+            _logger.LogBadCircuitBreakerInfo($"Ошибка номер {FailureCount}");
+            
+            LastFailureTime = DateTime.UtcNow;
+
+            if (FailureCount >= _maxFailuresBeforeOpen)
             {
-                _state = CircuitState.Open;
+                _logger.LogBadCircuitBreakerInfo($"Слишком много ошибок... Размыкаем цепь.");
+                State = CircuitState.Open;
+                _logger.CircuitBreakerStateChange(State, CircuitState.Open);
             }
             
             return fallback();
