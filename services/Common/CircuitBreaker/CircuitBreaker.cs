@@ -1,4 +1,5 @@
 ﻿using Common.CircuitBreaker.Enums;
+using Common.Errors;
 using Common.LoggerExtensions;
 using Microsoft.Extensions.Logging;
 
@@ -21,7 +22,7 @@ public class CircuitBreaker : ICircuitBreaker
     }
 
     // через этот метод запускается запрос
-    public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, Func<T> fallback)
+    public async Task<T> ExecuteAsync<T>(Func<Task<T>> action, Func<T> fallback = null)
     {
         _logger.LogGoodCircuitBreakerInfo("Щиток пробует выполнить метод");
         
@@ -40,7 +41,11 @@ public class CircuitBreaker : ICircuitBreaker
             else
             {
                 _logger.LogBadCircuitBreakerInfo("Рано, попробуй позже");
-                return fallback();
+
+                if (fallback != null)
+                    return fallback();
+                
+                throw new ServerDiedException("Щиток в кд, ожидаем полузакрытия");
             }
         }
 
@@ -79,7 +84,10 @@ public class CircuitBreaker : ICircuitBreaker
                 _logger.CircuitBreakerStateChange(State, CircuitState.Open);
             }
             
-            return fallback();
+            if (fallback != null)
+                return fallback();
+                
+            throw new ServerDiedException("Слишком много неудачных попыток, размыкаем цепь");
         }
     }
 }

@@ -7,6 +7,7 @@ using Common.DtoModels.ErrorDto;
 using Common.DtoModels.FlightServiceDto;
 using Common.DtoModels.GatewayDto;
 using Common.DtoModels.TicketsServiceDto;
+using Common.Errors;
 using Common.Fallbacks;
 
 namespace GatewayService.Controllers
@@ -40,17 +41,18 @@ namespace GatewayService.Controllers
             try
             {
                 HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/flights");
-                
                 PaginationResponse? response = await _circuitBreakersController.ExecuteAsync(
                     Services.Flights,
-                    async () => await SendRequest<PaginationResponse>(_flightsClient, request),
-                    () => _fallbacks.GetFlightsFallback()
+                    async () => await SendRequest<PaginationResponse>(_flightsClient, request)
                 );
                 
                 return Ok(response);
             }
             catch (Exception ex)
             {
+                if (ex is ServerDiedException)
+                    return StatusCode(503, new ErrorResponse { Message = ex.Message });
+
                 return StatusCode(500, new ErrorResponse { Message = ex.Message });
             }
         }
@@ -62,7 +64,7 @@ namespace GatewayService.Controllers
             {
                 HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/flights/{flightNumber}");
                 
-                FlightResponse? response = await _circuitBreakersController.ExecuteAsync(
+                FlightResponse? response = await _circuitBreakersController.ExecuteSoftAsync(
                     Services.Flights,
                     async () => await SendRequest<FlightResponse>(_flightsClient, request),
                     () => _fallbacks.GetFlightDataFallback(flightNumber)
@@ -87,7 +89,7 @@ namespace GatewayService.Controllers
                 HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/tickets");
                 request.Headers.Add("X-User-Name", usernameValue[0]);
                 
-                List<TicketResponse>? response = await _circuitBreakersController.ExecuteAsync(
+                List<TicketResponse>? response = await _circuitBreakersController.ExecuteSoftAsync(
                     Services.Tickets,
                     async () => await SendRequest<List<TicketResponse>>(_ticketsClient, request),
                     () => _fallbacks.GetAllTicketsFallback()
@@ -97,6 +99,9 @@ namespace GatewayService.Controllers
             }
             catch (Exception ex)
             {
+                if (ex is ServerDiedException)
+                    return StatusCode(503, new ErrorResponse { Message = ex.Message });
+                
                 return StatusCode(500, new ErrorResponse { Message = ex.Message });
             }
         }
@@ -112,7 +117,7 @@ namespace GatewayService.Controllers
                 HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/tickets/{ticketUid}");
                 request.Headers.Add("X-User-Name", usernameValue[0]);
                 
-                TicketResponse? response = await _circuitBreakersController.ExecuteAsync(
+                TicketResponse? response = await _circuitBreakersController.ExecuteSoftAsync(
                     Services.Tickets,
                     async () => await SendRequest<TicketResponse>(_ticketsClient, request),
                     () => _fallbacks.GetTicketsFallback(ticketUid)
@@ -122,6 +127,9 @@ namespace GatewayService.Controllers
             }
             catch (Exception ex)
             {
+                if (ex is ServerDiedException)
+                    return StatusCode(503, new ErrorResponse { Message = ex.Message });
+                
                 return StatusCode(500, new ErrorResponse { Message = ex.Message });
             }
         }
@@ -193,7 +201,7 @@ namespace GatewayService.Controllers
                 var ticketsRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/tickets");
                 ticketsRequest.Headers.Add("X-User-Name", username);
                 
-                List<TicketResponse>? ticketsResponse = await _circuitBreakersController.ExecuteAsync(
+                List<TicketResponse>? ticketsResponse = await _circuitBreakersController.ExecuteSoftAsync(
                     Services.Tickets,
                     async () => await SendRequest<List<TicketResponse>>(_ticketsClient, ticketsRequest),
                     () => _fallbacks.GetAllTicketsFallback()
@@ -202,7 +210,7 @@ namespace GatewayService.Controllers
                 var bonusRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/privilege");
                 bonusRequest.Headers.Add("X-User-Name", username);
                 
-                PrivilegeShortInfo? bonusResponse = await _circuitBreakersController.ExecuteAsync(
+                PrivilegeShortInfo? bonusResponse = await _circuitBreakersController.ExecuteSoftAsync(
                     Services.Bonuses,
                     async () => await SendRequest<PrivilegeShortInfo>(_privilegeClient, bonusRequest),
                     () => _fallbacks.GetPrivilegeShortInfoFallback()
@@ -235,7 +243,7 @@ namespace GatewayService.Controllers
                 var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/privilege");
                 request.Headers.Add("X-User-Name", username);
                 
-                PrivilegeInfoResponse? response = await _circuitBreakersController.ExecuteAsync(
+                PrivilegeInfoResponse? response = await _circuitBreakersController.ExecuteSoftAsync(
                     Services.Flights,
                     async () => await SendRequest<PrivilegeInfoResponse>(_privilegeClient, request),
                     () => _fallbacks.GetPrivilegeInfoResponseFallback()
@@ -245,6 +253,9 @@ namespace GatewayService.Controllers
             }
             catch (Exception ex)
             {
+                if (ex is ServerDiedException)
+                    return StatusCode(503, new ErrorResponse { Message = ex.Message });
+                
                 return StatusCode(500, new ErrorResponse { Message = ex.Message });
             }
         }
