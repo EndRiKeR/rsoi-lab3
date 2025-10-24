@@ -1,6 +1,10 @@
+using Common.CircuitBreaker;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+
+builder.Services.AddScoped<CircuitBreaker>();
 
 builder.Services.AddHttpClient("FlightService", client =>
 {
