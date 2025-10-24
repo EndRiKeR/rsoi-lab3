@@ -2,6 +2,7 @@ using System.Security.Cryptography.X509Certificates;
 using Common.DtoModels.BonusServiceDto;
 using Common.DtoModels.FlightServiceDto;
 using Common.DtoModels.TicketsServiceDto;
+using Microsoft.Extensions.Primitives;
 
 namespace Common.Fallbacks;
 
@@ -15,6 +16,18 @@ public class ControllersFallbacks
             PageSize = 0,
             TotalElements = 0,
             Items = []
+        };
+    }
+    
+    public FlightResponse GetFlightDataFallback(string flightNumber)
+    {
+        return new FlightResponse
+        {
+            FlightNumber = flightNumber,
+            FromAirport = "",
+            ToAirport = "0",
+            Date = DateTime.Now,
+            Price = 0,
         };
     }
     

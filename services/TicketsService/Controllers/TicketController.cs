@@ -75,9 +75,7 @@ namespace TicketsService.Controllers
                 var ticket = allTickets.FirstOrDefault(t => t.TicketUid == ticketUid && t.Username == username.ToString());
                 
                 if (ticket == null)
-                {
                     return NotFound(new ErrorResponse { Message = "Ticket not found" });
-                }
                 
                 var flightData = await GetFlightByNumber(ticket.FlightNumber);
                 
@@ -289,7 +287,7 @@ namespace TicketsService.Controllers
         
         private async Task<FlightResponse> GetFlightByNumber(string flightNumber)
         {
-            var flightRequest = new HttpRequestMessage(HttpMethod.Get, $"http://gateway-service:8080/api/v1/flights/{flightNumber}");
+            var flightRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/flights/{flightNumber}");
             var flightResponse = await _gatewayClient.SendAsync(flightRequest);
 
             if (!flightResponse.IsSuccessStatusCode)
