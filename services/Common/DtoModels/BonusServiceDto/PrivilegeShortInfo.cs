@@ -9,6 +9,6 @@ namespace Common.DtoModels.BonusServiceDto
         public int Balance { get; set; }
         
         [JsonPropertyName("status")]
-        public string Status { get; set; } = "BRONZE";
+        public string Status { get; set; }
     }
 }

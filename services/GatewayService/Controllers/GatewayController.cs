@@ -292,8 +292,12 @@ namespace GatewayService.Controllers
                     
                 if (bonusResponse?.Status == "ERROR")
                 {
-                    var safeTicketsResponse = ticketsResponse ?? new List<TicketResponse>();
-                    return Ok(safeTicketsResponse);
+                    var responseWithErrorBonus = new UserInfoResponse
+                    {
+                        Tickets = userInfo.Tickets,
+                        Privilege = new PrivilegeShortInfo()
+                    };
+                    return Ok(responseWithErrorBonus);
                 }
         
                 return Ok(userInfo);
@@ -426,8 +430,15 @@ namespace GatewayService.Controllers
                 Content = JsonContent.Create(debitRequest)
             };
             httpRequest.Headers.Add("X-User-Name", username);
-            
-            await _privilegeClient.SendAsync(httpRequest);
+
+            try
+            {
+                await _privilegeClient.SendAsync(httpRequest);
+            }
+            catch (Exception _)
+            {
+                throw new ServerDiedException("Bonus Service unavailable");
+            }
             
             var privilegeRequest = new HttpRequestMessage(HttpMethod.Get, "/api/v1/privilege");
             privilegeRequest.Headers.Add("X-User-Name", username);
@@ -436,7 +447,7 @@ namespace GatewayService.Controllers
                 Services.Bonus,
                 async () => await SendRequest<PrivilegeInfoResponse>(_privilegeClient, privilegeRequest)
             );
-
+            
             return new PrivilegeShortInfo
             {
                 Balance = response?.Balance ?? 0,

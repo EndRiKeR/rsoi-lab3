@@ -5,7 +5,7 @@ namespace Common.RetryQueue;
 
 public class RetryBackgroundService : BackgroundService
 {
-    public CancellationToken BackCancellationToken { get; set; }
+    public bool IsReadyToStop { get; set; } = false;
     
     private readonly RetryQueueService _queueService;
     private readonly IServiceProvider _serviceProvider;
@@ -13,19 +13,15 @@ public class RetryBackgroundService : BackgroundService
 
     public RetryBackgroundService(
         RetryQueueService queueService,
-        IServiceProvider serviceProvider,
-        CancellationTokenSource source)
+        IServiceProvider serviceProvider)
     {
         _queueService = queueService;
         _serviceProvider = serviceProvider;
-
-        BackCancellationToken = source.Token;
-
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken = default)
     {
-        while (!stoppingToken.IsCancellationRequested)
+        while (!IsReadyToStop)
         {
             try
             {
