@@ -42,7 +42,7 @@ namespace GatewayService.Controllers
             {
                 HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/flights");
                 PaginationResponse? response = await _circuitBreakersController.ExecuteAsync(
-                    Services.Flights,
+                    Services.Flight,
                     async () => await SendRequest<PaginationResponse>(_flightsClient, request)
                 );
                 
@@ -65,7 +65,7 @@ namespace GatewayService.Controllers
                 HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/flights/{flightNumber}");
                 
                 FlightResponse? response = await _circuitBreakersController.ExecuteSoftAsync(
-                    Services.Flights,
+                    Services.Flight,
                     async () => await SendRequest<FlightResponse>(_flightsClient, request),
                     () => _fallbacks.GetFlightDataFallback(flightNumber)
                 );
@@ -93,7 +93,7 @@ namespace GatewayService.Controllers
                 request.Headers.Add("X-User-Name", usernameValue[0]);
                 
                 List<TicketResponse>? response = await _circuitBreakersController.ExecuteSoftAsync(
-                    Services.Tickets,
+                    Services.Ticket,
                     async () => await SendRequest<List<TicketResponse>>(_ticketsClient, request),
                     () => _fallbacks.GetAllTicketsFallback()
                 );
@@ -121,7 +121,7 @@ namespace GatewayService.Controllers
                 request.Headers.Add("X-User-Name", usernameValue[0]);
                 
                 TicketResponse? response = await _circuitBreakersController.ExecuteSoftAsync(
-                    Services.Tickets,
+                    Services.Ticket,
                     async () => await SendRequest<TicketResponse>(_ticketsClient, request),
                     () => _fallbacks.GetTicketsFallback(ticketUid)
                 );
@@ -152,7 +152,7 @@ namespace GatewayService.Controllers
                 // если не найден - ошибка
                 var flightRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/flights/{requestDto.FlightNumber}");
                 FlightResponse? flightResponse = await _circuitBreakersController.ExecuteAsync(
-                    Services.Flights,
+                    Services.Flight,
                     async () => await SendRequest<FlightResponse>(_flightsClient, flightRequest)
                 );
                 flightRequest.Headers.Add("X-User-Name", usernameValue[0]);
@@ -173,7 +173,7 @@ namespace GatewayService.Controllers
                 addTicketRequest.Headers.Add("X-User-Name", usernameValue[0]);
                 
                 TicketAddResponse? ticketResponse = await _circuitBreakersController.ExecuteAsync(
-                    Services.Tickets,
+                    Services.Ticket,
                     async () => await SendRequest<TicketAddResponse>(_ticketsClient, addTicketRequest)
                 );
 
@@ -270,7 +270,7 @@ namespace GatewayService.Controllers
                 ticketsRequest.Headers.Add("X-User-Name", username);
                 
                 List<TicketResponse>? ticketsResponse = await _circuitBreakersController.ExecuteSoftAsync(
-                    Services.Tickets,
+                    Services.Ticket,
                     async () => await SendRequest<List<TicketResponse>>(_ticketsClient, ticketsRequest),
                     () => _fallbacks.GetAllTicketsFallback()
                 );
@@ -279,7 +279,7 @@ namespace GatewayService.Controllers
                 bonusRequest.Headers.Add("X-User-Name", username);
                 
                 PrivilegeShortInfo? bonusResponse = await _circuitBreakersController.ExecuteSoftAsync(
-                    Services.Bonuses,
+                    Services.Bonus,
                     async () => await SendRequest<PrivilegeShortInfo>(_privilegeClient, bonusRequest),
                     () => _fallbacks.GetPrivilegeShortInfoFallback()
                 );
@@ -321,7 +321,7 @@ namespace GatewayService.Controllers
                 request.Headers.Add("X-User-Name", username);
                 
                 PrivilegeInfoResponse? response = await _circuitBreakersController.ExecuteAsync(
-                    Services.Bonuses,
+                    Services.Bonus,
                     async () => await SendRequest<PrivilegeInfoResponse>(_privilegeClient, request)
                 );
                 
@@ -392,7 +392,7 @@ namespace GatewayService.Controllers
             request.Headers.Add("X-User-Name", username);
             
             PrivilegeInfoResponse? response = await _circuitBreakersController.ExecuteSoftAsync(
-                Services.Flights,
+                Services.Flight,
                 async () => await SendRequest<PrivilegeInfoResponse>(_privilegeClient, request),
                 () => _fallbacks.GetPrivilegeInfoResponseFallback()
             );
@@ -433,7 +433,7 @@ namespace GatewayService.Controllers
             privilegeRequest.Headers.Add("X-User-Name", username);
             
             PrivilegeInfoResponse? response = await _circuitBreakersController.ExecuteAsync(
-                Services.Bonuses,
+                Services.Bonus,
                 async () => await SendRequest<PrivilegeInfoResponse>(_privilegeClient, privilegeRequest)
             );
 

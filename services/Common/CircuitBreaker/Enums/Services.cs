@@ -2,7 +2,7 @@
 
 public enum Services
 {
-    Flights,
-    Tickets,
-    Bonuses
+    Flight,
+    Ticket,
+    Bonus
 }
