@@ -243,7 +243,16 @@ namespace GatewayService.Controllers
                 // нет - все ок + бесконечный ретрай запроса
                 if (response.IsSuccessStatusCode)
                 {
-                    var bonusRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/privilege/return-balance");
+                    ReturnBalanceHistoryRequest body = new ReturnBalanceHistoryRequest()
+                    {
+                        TicketUid = ticketUid,
+                    };
+                    
+                    var bonusRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/privilege/return-balance")
+                    {
+                        Content = JsonContent.Create(body)
+                    };
+                    
                     bonusRequest.Headers.Add("X-User-Name", username);
 
                     try
@@ -254,7 +263,11 @@ namespace GatewayService.Controllers
                             Client = _privilegeClient,
                             RequestBody = bonusRequest,
                             Attempts = 0,
-                            CreatedAt = DateTime.Now
+                            CreatedAt = DateTime.Now,
+                            Username = username,
+                            Api = "/api/v1/privilege/return-balance",
+                            HttpMethod = HttpMethod.Post,
+                            Body = body,
                         });
                     }
                     catch (Exception _)
@@ -264,7 +277,11 @@ namespace GatewayService.Controllers
                             Client = _privilegeClient,
                             RequestBody = bonusRequest,
                             Attempts = 0,
-                            CreatedAt = DateTime.Now
+                            CreatedAt = DateTime.Now,
+                            Username = username,
+                            Api = "/api/v1/privilege/return-balance",
+                            HttpMethod = HttpMethod.Post,
+                            Body = body,
                         });
                     }
                     

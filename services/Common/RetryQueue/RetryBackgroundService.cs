@@ -1,4 +1,5 @@
-﻿using Common.RetryQueue;
+﻿using System.Net.Http.Json;
+using Common.RetryQueue;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -50,7 +51,13 @@ public class RetryBackgroundService : BackgroundService
     {
         try
         {
-            var bonusResponse = await request.Client.SendAsync(request.RequestBody);
+            HttpRequestMessage msg = new HttpRequestMessage(request.HttpMethod, request.Api)
+            {
+                Content = JsonContent.Create(request.Body)
+            };
+            msg.Headers.Add("X-User-Name", request.Username);
+            
+            var bonusResponse = await request.Client.SendAsync(msg);
 
             if (!bonusResponse.IsSuccessStatusCode)
                 throw new Exception();
