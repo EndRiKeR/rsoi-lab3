@@ -6,9 +6,9 @@ namespace Common.DtoModels.BonusServiceDto
     public class PrivilegeShortInfo
     {
         [JsonPropertyName("balance")]
-        public int Balance { get; set; }
+        public int? Balance { get; set; }
         
         [JsonPropertyName("status")]
-        public string Status { get; set; }
+        public string? Status { get; set; }
     }
 }
