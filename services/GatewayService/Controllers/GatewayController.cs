@@ -290,7 +290,13 @@ namespace GatewayService.Controllers
                     Privilege = bonusResponse ?? new PrivilegeShortInfo(),
                 };
                     
-                return Ok(bonusResponse.Status == "ERROR" ? ticketsResponse : userInfo);
+                if (bonusResponse?.Status == "ERROR")
+                {
+                    var safeTicketsResponse = ticketsResponse ?? new List<TicketResponse>();
+                    return Ok(safeTicketsResponse);
+                }
+        
+                return Ok(userInfo);
 
             }
             catch (Exception ex)
