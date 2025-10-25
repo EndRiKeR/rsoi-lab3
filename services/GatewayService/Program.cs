@@ -1,5 +1,6 @@
 using Common.CircuitBreaker;
 using Common.Fallbacks;
+using Common.RetryQueue;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +8,8 @@ builder.Services.AddControllers();
 
 builder.Services.AddSingleton<CircuitBreakersController>();
 builder.Services.AddSingleton<ControllersFallbacks>();
+builder.Services.AddSingleton<RetryQueueService>();
+builder.Services.AddSingleton<RetryBackgroundService>();
 
 builder.Services.AddHttpClient("FlightService", client =>
 {
@@ -27,5 +30,8 @@ var app = builder.Build();
 
 app.UseRouting();
 app.MapControllers();
+
+var backgroundService = app.Services.GetService<RetryBackgroundService>();
+// backgroundService.ExecuteTask(new CancellationToken());
 
 app.Run();

@@ -15,21 +15,14 @@ public class RetryQueueService
     public void Enqueue(RetryRequest request)
     {
         _queue.Enqueue(request);
-        _semaphore.Release(); // Увеличиваем счетчик семафора
+        _semaphore.Release();
     }
 
     public async Task<RetryRequest?> DequeueAsync(CancellationToken cancellationToken = default)
     {
-        // Ждем, пока в очереди появится элемент
         await _semaphore.WaitAsync(cancellationToken);
         
-        // Достаем элемент из очереди
-        if (_queue.TryDequeue(out var request))
-        {
-            return request;
-        }
-        
-        return null;
+        return _queue.TryDequeue(out var request) ? request : null;
     }
 
     public bool TryDequeue(out RetryRequest? request)
