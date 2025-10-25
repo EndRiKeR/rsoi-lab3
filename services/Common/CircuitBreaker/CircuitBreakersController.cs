@@ -47,6 +47,7 @@ public class CircuitBreakersController
             _controllerLogger.LogBadCircuitBreakerInfo($"Не нашел щиток для {service}. Создаю новый.");
             
             _circuitBreakers[service] = new CircuitBreaker(_logger);
+            _circuitBreakers[service].ServiceType = service;
             return _circuitBreakers[service];
         }
     }

@@ -9,6 +9,7 @@ public class CircuitBreaker : ICircuitBreaker
 {
     public CircuitState State { get; set; } = CircuitState.Closed;
     public int FailureCount { get; set; } = 0;
+    public Services ServiceType { get; set; }
     private DateTime LastFailureTime { get; set; } = DateTime.MinValue;
 
     private readonly ILogger<CircuitBreaker> _logger;
@@ -45,7 +46,7 @@ public class CircuitBreaker : ICircuitBreaker
                 if (fallback != null)
                     return fallback();
                 
-                throw new ServerDiedException("Щиток в кд, ожидаем полузакрытия");
+                throw new ServerDiedException($"{ServiceType} Service unavailable");
             }
         }
 
@@ -87,7 +88,7 @@ public class CircuitBreaker : ICircuitBreaker
             if (fallback != null)
                 return fallback();
                 
-            throw new ServerDiedException("Слишком много неудачных попыток, размыкаем цепь");
+            throw new ServerDiedException($"{ServiceType} Service unavailable");
         }
     }
 }
