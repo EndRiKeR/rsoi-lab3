@@ -134,7 +134,7 @@ namespace BonusService.Controllers
                 var username = usernameValues[0];
                 PrivilegeDto privilege = new PrivilegeDto(await _privilegeRepository.GetByUsername(username));
                 
-                await _privilegeRepository.UpdateBalance(privilege.Id, history.OperationType == "DEBIT_THE_ACCOUNT" ? history.BalanceDiff : -history.BalanceDiff);
+                await _privilegeRepository.UpdateBalance(privilege.Id, -history.BalanceDiff);
                 
                 return Ok(privilege);
             }
