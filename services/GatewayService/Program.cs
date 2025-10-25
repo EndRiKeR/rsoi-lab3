@@ -9,6 +9,9 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<CircuitBreakersController>();
 builder.Services.AddSingleton<ControllersFallbacks>();
 
+builder.Services.AddSingleton<RetryQueueService>();
+builder.Services.AddHostedService<RetryBackgroundService>();
+
 builder.Services.AddHttpClient("FlightService", client =>
 {
     client.BaseAddress = new Uri("http://flight-service:8060");

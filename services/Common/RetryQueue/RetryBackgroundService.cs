@@ -1,27 +1,27 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Common.RetryQueue;
 using Microsoft.Extensions.Hosting;
-
-namespace Common.RetryQueue;
+using Microsoft.Extensions.Logging;
 
 public class RetryBackgroundService : BackgroundService
 {
-    public bool IsReadyToStop { get; set; } = false;
-    
+    private readonly ILogger<RetryBackgroundService> _logger;
     private readonly RetryQueueService _queueService;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly TimeSpan _retryInterval = TimeSpan.FromSeconds(10);
+    private readonly TimeSpan _retryInterval;
 
     public RetryBackgroundService(
         RetryQueueService queueService,
-        IServiceProvider serviceProvider)
+        ILogger<RetryBackgroundService> logger)
     {
         _queueService = queueService;
-        _serviceProvider = serviceProvider;
+        _logger = logger;
+        _retryInterval = TimeSpan.FromSeconds(10);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken = default)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        while (!IsReadyToStop)
+        _logger.LogInformation("🚀 RetryBackgroundService started");
+
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
@@ -32,47 +32,48 @@ public class RetryBackgroundService : BackgroundService
                 if (request != null)
                     await ProcessRetryRequestAsync(request);
             }
-            catch (OperationCanceledException _)
+            catch (OperationCanceledException)
             {
+                _logger.LogInformation("⏹️ RetryBackgroundService stopping");
                 break;
             }
-            catch (Exception _) { }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Error in RetryBackgroundService");
+            }
         }
+
+        _logger.LogInformation("🛑 RetryBackgroundService stopped");
     }
 
     private async Task ProcessRetryRequestAsync(RetryRequest request)
     {
         try
         {
-            using var scope = _serviceProvider.CreateScope();
+            var bonusResponse = await request.Client.SendAsync(request.RequestBody);
+
+            if (!bonusResponse.IsSuccessStatusCode)
+                throw new Exception();
             
-            switch (request.Type)
-            {
-                case RetryType.RETURN_BONUSES:
-                    await ProcessReturnBonusesAsync(request, scope);
-                    break;
-                case RetryType.UPDATE_BALANCE:
-                    await UpdateBalanceAsync(request, scope);
-                    break;
-            }
+            _logger.LogInformation("✅ Successfully processed retry request");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogError(ex, "❌ Failed to process retry request");
+            
             request.Attempts++;
             request.LastAttemptAt = DateTime.UtcNow;
-            _queueService.Enqueue(request);
+            
+            if (request.Attempts < 30)
+            {
+                _queueService.Enqueue(request);
+                _logger.LogWarning("🔄 Re-queued request {Type} (attempt {Attempt})", 
+                    request.RequestBody, request.Attempts);
+            }
+            else
+            {
+                _logger.LogError("💥 Max retry attempts exceeded for request");
+            }
         }
-    }
-
-    private async Task ProcessReturnBonusesAsync(RetryRequest request, IServiceScope scope)
-    {
-        // var bonusService = scope.ServiceProvider.GetRequiredService<IBonusService>();
-        // await bonusService.ReturnBonusesAsync(request.TicketUid, request.Username);
-    }
-
-    private async Task UpdateBalanceAsync(RetryRequest request, IServiceScope scope)
-    {
-        // В реальности будем десериализовать данные из SerializedData
-        // и вызывать соответствующий метод BonusService
     }
 }

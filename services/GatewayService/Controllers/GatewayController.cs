@@ -9,6 +9,7 @@ using Common.DtoModels.GatewayDto;
 using Common.DtoModels.TicketsServiceDto;
 using Common.Errors;
 using Common.Fallbacks;
+using Common.RetryQueue;
 
 namespace GatewayService.Controllers
 {
@@ -21,11 +22,13 @@ namespace GatewayService.Controllers
         private readonly HttpClient _privilegeClient;
         private readonly CircuitBreakersController _circuitBreakersController;
         private readonly ControllersFallbacks _fallbacks;
+        private readonly RetryQueueService _queueService;
         
         public GatewayController(
             IHttpClientFactory httpClientFactory,
             CircuitBreakersController circuitBreakersController,
-            ControllersFallbacks fallbacks)
+            ControllersFallbacks fallbacks,
+            RetryQueueService queueService)
         {
             _privilegeClient = httpClientFactory.CreateClient("BonusService");
             _flightsClient = httpClientFactory.CreateClient("FlightService");
@@ -33,6 +36,7 @@ namespace GatewayService.Controllers
             
             _circuitBreakersController = circuitBreakersController;
             _fallbacks = fallbacks;
+            _queueService = queueService;
         }
         
         [HttpGet("flights")]
@@ -241,7 +245,13 @@ namespace GatewayService.Controllers
 
                     if (!bonusResponse.IsSuccessStatusCode)
                     {
-                        // to repeat try
+                        _queueService.Enqueue(new RetryRequest()
+                        {
+                            Client = _privilegeClient,
+                            RequestBody = bonusRequest,
+                            Attempts = 0,
+                            CreatedAt = DateTime.Now,
+                        });
                     }
                 }
                 
