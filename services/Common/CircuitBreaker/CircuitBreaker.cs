@@ -8,8 +8,9 @@ namespace Common.CircuitBreaker;
 public class CircuitBreaker : ICircuitBreaker
 {
     public CircuitState State { get; set; } = CircuitState.Closed;
-    public int FailureCount { get; set; } = 0;
     public Services ServiceType { get; set; }
+    
+    public List<DateTime> FailureTimes { get; set; } = new List<DateTime>();
     private DateTime LastFailureTime { get; set; } = DateTime.MinValue;
 
     private readonly ILogger<CircuitBreaker> _logger;
@@ -59,8 +60,6 @@ public class CircuitBreaker : ICircuitBreaker
             
             _logger.LogGoodCircuitBreakerInfo("Все ок!");
             
-            FailureCount = 0;
-            
             // замыкаем цепь при успешном выполнении
             if (State == CircuitState.HalfOpen)
             {
@@ -72,14 +71,16 @@ public class CircuitBreaker : ICircuitBreaker
         }
         catch (Exception)
         {
-            FailureCount++;
+            FailureTimes.Add(DateTime.UtcNow);
             
-            _logger.LogBadCircuitBreakerInfo($"Ошибка номер {FailureCount}");
+            _logger.LogBadCircuitBreakerInfo($"Ошибка номер {CountFailuresByMinutes()}");
             
             LastFailureTime = DateTime.UtcNow;
 
-            if (FailureCount >= _maxFailuresBeforeOpen)
+            if (CheckForSoMuchFailures())
             {
+                FailureTimes.Clear();
+                
                 _logger.LogBadCircuitBreakerInfo($"Слишком много ошибок... Размыкаем цепь.");
                 State = CircuitState.Open;
                 _logger.CircuitBreakerStateChange(State, CircuitState.Open);
@@ -90,5 +91,15 @@ public class CircuitBreaker : ICircuitBreaker
                 
             throw new ServerDiedException($"{ServiceType} Service unavailable");
         }
+    }
+    
+    private bool CheckForSoMuchFailures()
+    {
+        return CountFailuresByMinutes() >= _maxFailuresBeforeOpen;
+    }
+
+    private int CountFailuresByMinutes()
+    {
+        return FailureTimes.Count(time => time > DateTime.Now.AddMinutes(-5));
     }
 }
