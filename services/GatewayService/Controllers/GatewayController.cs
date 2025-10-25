@@ -23,12 +23,15 @@ namespace GatewayService.Controllers
         private readonly CircuitBreakersController _circuitBreakersController;
         private readonly ControllersFallbacks _fallbacks;
         private readonly RetryQueueService _queueService;
+
+        private readonly ILogger<RetryQueueService> _logger;
         
         public GatewayController(
             IHttpClientFactory httpClientFactory,
             CircuitBreakersController circuitBreakersController,
             ControllersFallbacks fallbacks,
-            RetryQueueService queueService)
+            RetryQueueService queueService,
+            ILogger<RetryQueueService> logger)
         {
             _privilegeClient = httpClientFactory.CreateClient("BonusService");
             _flightsClient = httpClientFactory.CreateClient("FlightService");
@@ -37,6 +40,7 @@ namespace GatewayService.Controllers
             _circuitBreakersController = circuitBreakersController;
             _fallbacks = fallbacks;
             _queueService = queueService;
+            _logger = logger;
         }
         
         [HttpGet("flights")]
@@ -237,22 +241,33 @@ namespace GatewayService.Controllers
                 
                 // запрос к бонусам для отката траты/получения
                 // нет - все ок + бесконечный ретрай запроса
-                if (!response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode)
                 {
                     var bonusRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/privilege/return-balance");
                     bonusRequest.Headers.Add("X-User-Name", username);
-                    var bonusResponse = await _privilegeClient.SendAsync(bonusRequest);
 
-                    if (!bonusResponse.IsSuccessStatusCode)
+                    try
+                    {
+                        await _privilegeClient.SendAsync(bonusRequest);
+                        _queueService.Enqueue(new RetryRequest()
+                        {
+                            Client = _privilegeClient,
+                            RequestBody = bonusRequest,
+                            Attempts = 0,
+                            CreatedAt = DateTime.Now
+                        });
+                    }
+                    catch (Exception _)
                     {
                         _queueService.Enqueue(new RetryRequest()
                         {
                             Client = _privilegeClient,
                             RequestBody = bonusRequest,
                             Attempts = 0,
-                            CreatedAt = DateTime.Now,
+                            CreatedAt = DateTime.Now
                         });
                     }
+                    
                 }
                 
                 return NoContent();
