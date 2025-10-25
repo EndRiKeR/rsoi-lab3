@@ -178,7 +178,7 @@ public class PrivilegeRepository : IPrivilegeRepository
             if (privilege == null)
                 throw new Exception($"Privilege with id {privilegeId} not found");
 
-            privilege.Balance = (privilege.Balance ?? 0) + balanceDiff;
+            privilege.Balance = Math.Max((privilege.Balance ?? 0) + balanceDiff, 0);
             await _context.SaveChangesAsync();
         }
         catch (Exception e)
